@@ -197,13 +197,14 @@ public:
 			return;
 
 		vector<int> prohibited_indexes;
-
+		int index_point;
 		// choose K distinct values for the centers of the clusters
 		for(int i = 0; i < K; i++)
 		{
 			while(true)
 			{
-				int index_point = rand() % total_points;
+				//int index_point = rand() % total_points;
+				index_point = K*i+1;
 
 				if(find(prohibited_indexes.begin(), prohibited_indexes.end(),
 						index_point) == prohibited_indexes.end())
@@ -223,6 +224,7 @@ public:
 		while(true)
 		{
 			bool done = true;
+			cout << "start";
 
 			// associates each point to the nearest center
 			for(int i = 0; i < total_points; i++)
@@ -240,6 +242,7 @@ public:
 					done = false;
 				}
 			}
+			cout << "end";
 
 			// recalculating the center of each cluster
 			for(int i = 0; i < K; i++)
@@ -274,19 +277,19 @@ public:
 			int total_points_cluster =  clusters[i].getTotalPoints();
 
 			cout << "Cluster " << clusters[i].getID() + 1 << endl;
-			for(int j = 0; j < total_points_cluster; j++)
-			{
-				cout << "Point " << clusters[i].getPoint(j).getID() + 1 << ": ";
-				for(int p = 0; p < total_values; p++)
-					cout << clusters[i].getPoint(j).getValue(p) << " ";
+			// for(int j = 0; j < total_points_cluster; j++)
+			// {
+			// 	cout << "Point " << clusters[i].getPoint(j).getID() + 1 << ": ";
+			// 	for(int p = 0; p < total_values; p++)
+			// 		cout << clusters[i].getPoint(j).getValue(p) << " ";
 
-				string point_name = clusters[i].getPoint(j).getName();
+			// 	string point_name = clusters[i].getPoint(j).getName();
 
-				if(point_name != "")
-					cout << "- " << point_name;
+			// 	if(point_name != "")
+			// 		cout << "- " << point_name;
 
-				cout << endl;
-			}
+			// 	cout << endl;
+			// }
 
 			cout << "Cluster values: ";
 
@@ -315,7 +318,7 @@ int main(int argc, char *argv[])
 	vector<Point> points;
 	string point_name;
 
-	string FILENAME="./datasets/dataset1.txt";
+	string FILENAME="./datasets/dataset4.txt";
 
 	std::ifstream file(FILENAME);
 	if (file.is_open()) {

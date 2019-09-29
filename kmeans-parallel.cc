@@ -12,7 +12,7 @@
 #include "tbb/enumerable_thread_specific.h"
 
 using namespace std;
-
+using namespace tbb;
 
 
 
@@ -44,6 +44,11 @@ public:
 		return id_point;
 	}
 
+	vector<double> getValues()
+	{
+		return values;
+	}
+
 	void setCluster(int id_cluster)
 	{
 		this->id_cluster = id_cluster;
@@ -62,6 +67,11 @@ public:
     void updateValue(int index,double val)
     {
         values[index]=val;
+    }
+
+	void updateValues(vector<double> val)
+    {
+        values.assign(val.begin(),val.end()); 
     }
 
 	int getTotalValues()
@@ -95,10 +105,15 @@ class sum_and_count
     public:
 
     void tally(Point p ) {
-        for (int j=0;j<sum.getTotalValues();j++)
+         for (int j=0;j<sum.getTotalValues();j++)
         {
             sum.updateValue(j,sum.getValue(j)+p.getValue(j));
-        }
+        } 
+
+		/* vector<double> inter=sum.getValues();
+		
+		 std::transform (inter.begin(), inter.end(), p.getValues().begin(), inter.begin(), std::plus<double>());
+		 sum.updateValues(inter); */
         ++count;
         }
 
@@ -230,7 +245,7 @@ class KMeans
 {
 private:
 	int K; // number of clusters
-	int total_values, total_points, max_iterations;
+	int total_values, total_points, max_iterations,n_threads,grain_size;
 	vector<Cluster> clusters;
 
 	// return ID of nearest center (uses euclidean distance)
@@ -271,12 +286,14 @@ private:
 	}
 
 public:
-	KMeans(int K, int total_points, int total_values, int max_iterations)
+	KMeans(int K, int total_points, int total_values, int max_iterations,int n_threads, int grain_size)
 	{
 		this->K = K;
 		this->total_points = total_points;
 		this->total_values = total_values;
 		this->max_iterations = max_iterations;
+		this->n_threads = n_threads;
+		this->grain_size = grain_size;
 	}
 
 	void run(vector<Point> & points)
@@ -310,13 +327,15 @@ public:
 			return;
 
 		vector<int> prohibited_indexes;
-
+		tbb::task_scheduler_init init(n_threads);
 		// choose K distinct values for the centers of the clusters
+		int index_point;
 		for(int i = 0; i < K; i++)
 		{
 			while(true)
 			{
-				int index_point = rand() % total_points;
+				//int index_point = rand() % total_points;
+				index_point = K*i+1;
 
 				if(find(prohibited_indexes.begin(), prohibited_indexes.end(),
 						index_point) == prohibited_indexes.end())
@@ -332,6 +351,11 @@ public:
         auto end_phase1 = chrono::high_resolution_clock::now();
         
 		int iter = 1;
+		if (grain_size==0)
+			grain_size=total_points/n_threads;
+
+		cout << "grain_size= " << grain_size << "\n\n";
+
 		while(true)
 		{
 			bool done = true;
@@ -339,7 +363,7 @@ public:
 
                         // Compute new clusters and their local sums
             tbb::parallel_for(
-            tbb::blocked_range<size_t>(0,total_points),
+            tbb::blocked_range<size_t>(0,total_points,grain_size),
             [&]( tbb::blocked_range<size_t> r ) {
                 view& v = tls.local();
                 for( size_t i=r.begin(); i!=r.end(); ++i ) {
@@ -356,7 +380,7 @@ public:
                 }
             }
 
-            );
+            ,tbb::simple_partitioner());
 
             // Reduce local counts to global count
             reduce_local_counts_to_global_count(tls, global);
@@ -426,8 +450,41 @@ public:
 	}
 };
 
+/** Print some helpful usage information */
+void usage() {
+  using std::cout;
+  cout << "Parallel K-Means\n";
+  cout << "  Usage: gauss [options]\n";
+  cout << "    -t       : number of threads (default 4)\n";
+  cout << "    -g       : grain size (default total_points/n_threads)\n";
+  cout << "    -h       : print this message\n";
+}
+
 int main(int argc, char *argv[])
 {
+
+	int NThreads=4;
+  int grain_size=0;
+
+  // Parse the command line options:
+  int o;
+  while ((o = getopt(argc, argv, "t:g:h")) != -1) {
+    switch (o) {
+    case 't':
+      NThreads = atoi(optarg);
+      break;
+    case 'g':
+      grain_size = atoi(optarg);
+      break;
+    case 'h':
+      usage();
+	  exit(-1);
+      break;
+    default:
+      usage();
+      exit(-1);
+    }
+  }
 	srand (time(NULL));
 
 	int total_points, total_values, K, max_iterations, has_name;
@@ -437,7 +494,7 @@ int main(int argc, char *argv[])
 	vector<Point> points;
 	string point_name;
 
-	string FILENAME="./datasets/dataset2.txt";
+	string FILENAME="./datasets/dataset5.txt";
 
 	std::ifstream file(FILENAME);
 	if (file.is_open()) {
@@ -499,7 +556,7 @@ int main(int argc, char *argv[])
 		file.close();
 	}
 
-	KMeans kmeans(K, total_points, total_values, max_iterations);
+	KMeans kmeans(K, total_points, total_values, max_iterations,NThreads,grain_size);
 	kmeans.run(points);
 
 	return 0;
