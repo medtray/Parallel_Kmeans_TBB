@@ -14,7 +14,7 @@
 #include  <iostream>
 #include <algorithm>
 #include <numeric>
-
+#include <omp.h>
 
 using namespace std;
 using namespace tbb;
@@ -408,6 +408,8 @@ public:
 
 		vector<int> prohibited_indexes;
 		tbb::task_scheduler_init init(n_threads);
+        omp_set_dynamic(0);     // Explicitly disable dynamic teams
+        omp_set_num_threads(n_threads);
 		// choose K distinct values for the centers of the clusters
 		int index_point;
 		for(int i = 0; i < K; i++)
@@ -442,11 +444,10 @@ public:
 
 
                         // Compute new clusters and their local sums
-            tbb::parallel_for(
-            tbb::blocked_range<size_t>(0,total_points,grain_size),
-            [&]( tbb::blocked_range<size_t> r ) {
-                view& v = tls.local();
-                for( size_t i=r.begin(); i!=r.end(); ++i ) {
+           
+                #pragma omp parallel for
+                for( int i = 0; i < total_points; i++ ) {
+                    view& v = tls.local();
                     // “Reassign step”: Find index of centroid closest to points [i]
                     int id_nearest_center = getIDNearestCenter(points[i]);
                     int id_old_cluster = points[i].getCluster();
@@ -458,9 +459,9 @@ public:
                     
                     v.array[id_nearest_center].tally(points[i]);
                 }
-            }
+            
 
-            ,tbb::simple_partitioner());
+            
 
             // Reduce local counts to global count
             reduce_local_counts_to_global_count(tls, global);
@@ -515,10 +516,10 @@ public:
 				cout << endl;
 			} */
 
-			/* cout << "Cluster values: ";
+			 cout << "Cluster values: ";
 
 			for(int j = 0; j < total_values; j++)
-				cout << clusters[i].getCentralValue(j) << " "; */
+				cout << clusters[i].getCentralValue(j) << " "; 
 
 			cout << "\n\n";
             cout << "TOTAL EXECUTION TIME = "<<std::chrono::duration_cast<std::chrono::microseconds>(end-begin).count()<<"\n";
@@ -543,7 +544,7 @@ void usage() {
 int main(int argc, char *argv[])
 {
 
-	int NThreads=1;
+	int NThreads=2;
   int grain_size=0;
   int simd=0;
   string FILENAME="./datasets/dataset2.txt";

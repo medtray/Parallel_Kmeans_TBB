@@ -1,5 +1,5 @@
 # names of .cc files that have a main() function
-TARGETS = kmeans475-serial kmeans-parallel
+TARGETS = kmeans475-serial kmeans-parallel kmeans-parallel-openmp
 
 # names of other .cc files
 CXXFILES = # none for now
@@ -22,8 +22,8 @@ DFILES       = $(patsubst %.o, %.d, $(ALLOFILES))
 # Note: These lines will require some changes in order to work with TBB
 CXX      = g++
 LD       = g++
-CXXFLAGS = -MMD -O0 -m$(BITS) -ggdb -std=c++11 -Wall -L /usr/local/tbb -ltbb 
-LDFLAGS  = -m$(BITS) -lm -std=c++1y -Wall -L /usr/local/tbb -ltbb 
+CXXFLAGS = -MMD -O3 -m$(BITS) -ggdb -std=c++11 -Wall -L /usr/local/tbb -ltbb -fopenmp
+LDFLAGS  = -m$(BITS) -lm -std=c++1y -Wall -L /usr/local/tbb -ltbb -fopenmp
 
 # Standard build targets and rules follow
 .DEFAULT_GOAL = all
